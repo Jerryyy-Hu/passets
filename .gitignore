@@ -1,0 +1,8 @@
+.local/
+test-results/
+playwright-report/
+node_modules/
+.env
+.env.*
+*.log
+*backup*.json
