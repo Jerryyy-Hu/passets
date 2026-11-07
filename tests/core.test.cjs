@@ -35,6 +35,7 @@ test('phrase matching respects word boundaries and punctuation',()=>{
   assert.equal(C.diffWords('A healthy lifestyle.','A healthy lifestyle.').core.length,0);
 });
 test('hyphenated collocations remain whole clickable phrases',()=>{const d=C.diffWords('Workers need balance.','Workers need work-life balance.',[{word:'work-life balance'}]);assert.equal(d.core[0].word,'work-life balance');});
+test('possessive apostrophes never become vocabulary capsules',()=>{const d=C.diffWords('Help students.','Help students’ diverse needs.');assert.ok(d.core.every(p=>/[A-Za-z]/.test(p.word)));assert.ok(d.operations.some(t=>t.text==='’'&&t.type==='punct'));});
 test('safe JSON parser accepts fences and prose but never evaluates JavaScript',()=>{
   assert.deepEqual(C.parseJSON('```json\n{"ok":true}\n```'),{ok:true});assert.deepEqual(C.parseJSON('Result: {"ok":true}'),{ok:true});assert.throws(()=>C.parseJSON('{ok:globalThis.hacked=true}'));
 });

@@ -130,7 +130,7 @@
       if(/^\s+$/.test(raw[i])){tokens.push({text:raw[i],key:raw[i],type:'space'});i++;continue;}
       let found=null;
       for(const p of phrases){let j=i,k=0;while(j<raw.length&&k<p.parts.length){if(/^\s+$/.test(raw[j])){j++;continue;}if(normalize(raw[j])!==p.parts[k])break;j++;k++;}if(k===p.parts.length){found={text:raw.slice(i,j).join(''),key:p.parts.join(' '),type:'phrase',phrase:p,end:j};break;}}
-      if(found){const {end,...t}=found;tokens.push(t);i=end;}else{const key=normalize(raw[i]);tokens.push({text:raw[i],key,type:!key?'punct':STOP_WORDS.has(key)?'functional':'word'});i++;}
+      if(found){const {end,...t}=found;tokens.push(t);i=end;}else{const key=normalize(raw[i]);tokens.push({text:raw[i],key,type:!/[\p{L}\p{N}]/u.test(raw[i])?'punct':STOP_WORDS.has(key)?'functional':'word'});i++;}
     }
     return tokens;
   }
