@@ -10,6 +10,7 @@
 @media(max-width:370px){main{padding-left:12px;padding-right:12px}h1{font-size:22px}.streak-chip{display:none}.save-status{display:none}.control-fields{flex-wrap:wrap}.control-fields label{flex-basis:40%}.control-fields .refresh-question{display:none}.exercise-topic{display:none}.question-text{font-size:18px}.answer-footer{font-size:8px}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}button{transition:opacity 100ms ease,background-color 100ms ease}button:active{transform:none}.drawer,.settings-dialog,.toast{transition:opacity 160ms ease;transform:none!important}.diff-word{animation:none}.spinner{animation-duration:1.5s}.skeleton{animation:none}}
 .page-heading h1{font-size:29px;letter-spacing:.3px;line-height:1.5;margin-top:10px;font-weight:550}
+.settings-content .check-label input{display:inline-block;width:15px;flex:0 0 15px;margin:0;min-height:0}
 @media(max-width:700px){.page-heading h1{font-size:25px}}
 @media(max-width:370px){.page-heading h1{font-size:22px}}
 html.keyboard-action *,html.keyboard-action *::before,html.keyboard-action *::after{animation:none!important;transition:none!important}

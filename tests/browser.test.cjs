@@ -67,6 +67,7 @@ async function check(name,fn){await fn();report.push(name);console.log(`PASS ${n
     });
     await check('real UI uses an explicit error instead of a fabricated AI score when disconnected',async()=>{
       await page.locator('#submit-answer').click();assert.ok(await page.locator('#settings-dialog').isVisible());assert.equal(await page.locator('.band-score').count(),0);
+      assert.ok(await page.locator('input[name="sound"]').evaluate(input=>input.getBoundingClientRect().width<=20));
       await page.locator('#settings-dialog [data-action="close"]').click();await page.waitForFunction(()=>!document.querySelector('#settings-dialog').open);
     });
     assert.deepEqual(errors,[]);
