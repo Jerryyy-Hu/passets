@@ -4,7 +4,9 @@
   const C=window.Passets,$=id=>document.getElementById(id),e=C.escapeHTML;
   const defaultSettings={baseUrl:'https://api.deepseek.com/v1',model:'deepseek-flash',apiKey:'',sound:true};
   let settings={...defaultSettings},state,storageAvailable=true,storageConflict=false,toastTimeout,speech=null,speechActive=false,voiceBase='',audioContext=null;
-  let gradeBusy=new Set(),metadataBusy=new Set(),generationBusy=new Map(),generationError='',lastGeneratedContext='',closing=new Set();
+  let gradeBusy=new Set(),metadataBusy=new Set(),generationBusy=new Map(),generationError='',lastGeneratedContext='',closing=new Map();
+  let activeView='',viewAnimation=null,generationErrorRequested=false;
+  const themes={light:{name:'暖纸',color:'#f7f5ef'},sage:{name:'鼠尾草',color:'#eef2eb'},mist:{name:'雾蓝',color:'#eff3f6'},dusk:{name:'暮紫',color:'#f4eff3'},dark:{name:'石墨',color:'#1c2221'}};
   try{settings={...defaultSettings,...JSON.parse(localStorage.getItem(C.SETTINGS_KEY)||'{}')};}catch{}
   try{const saved=localStorage.getItem(C.STORAGE_KEY);state=saved?C.validateState(JSON.parse(saved)):C.initialState();}catch(error){
     state=C.initialState();storageAvailable=false;
@@ -69,19 +71,42 @@
     $('completed-count').innerHTML=`${state.historyQueue.length}<span>句</span>`;$('asset-count').innerHTML=`${state.vocabBank.length}<span>个</span>`;$('nav-vocab-count').textContent=state.vocabBank.length;
     $('practice-days').textContent=`${new Set(state.historyQueue.map(q=>dateKey(q.completedAt))).size} 天`;$('daily-count').textContent=`${todayCount} / 5`;$('goal-progress').style.transform=`scaleX(${Math.min(todayCount/5,1)})`;
     $('goal-message').textContent=todayCount>=5?'今日目标已完成。给坚持的自己一点掌声。':todayCount?`再练 ${5-todayCount} 句，完成今天的小目标。`:'从一句开始，找到表达的手感。';
-    $('weekly-bars').innerHTML=Array.from({length:7},(_,i)=>{const day=new Date();day.setDate(day.getDate()-6+i);const count=state.historyQueue.filter(q=>dateKey(q.completedAt)===dateKey(day)).length;return `<div class="day-bar ${i===6?'today':''}" title="${e(dateKey(day))} · ${count} 句"><span style="height:${Math.min(31,4+count*5)}px"></span>${['日','一','二','三','四','五','六'][day.getDay()]}</div>`;}).join('');
-    const words=[...state.vocabBank].sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,3);
-    $('vocab-preview').innerHTML=words.length?words.map(v=>`<div class="preview-word"><div><strong>${e(v.word)}</strong><p>${e(v.def||'释义待补全')}</p></div><button class="icon-button" data-action="target-word" data-id="${e(v.id)}" title="用此词出题练习" aria-label="用 ${e(v.word)} 出题练习">${icon('arrow-up-right')}</button></div>`).join(''):`<div class="empty-preview">${icon('bookmark-plus')}你的第一个好词，即将入库。<br>从靶向提示或批改建议中点击收藏。</div>`;
+    renderEntry();
     icons();
   }
   function renderControls(){
-    $('writing-tab').classList.toggle('active',state.mode==='writing');$('speaking-tab').classList.toggle('active',state.mode==='speaking');
-    $('writing-tab').setAttribute('aria-pressed',state.mode==='writing');$('speaking-tab').setAttribute('aria-pressed',state.mode==='speaking');
+    document.querySelectorAll('[data-action="mode"]').forEach(button=>{const selected=button.dataset.value===state.mode;button.classList.toggle('active',selected);button.setAttribute('aria-pressed',String(selected));});
+    document.querySelectorAll('.segmented').forEach(group=>{group.dataset.mode=state.mode;});
     $('mode-caption').textContent=state.mode==='writing'?'把准确的意思，写得更出色。':'把脑海里的想法，自然地说出来。';
     const select=$('topic-select');for(const item of [...select.options])if(item.dataset.custom)item.remove();if(!C.TOPICS[state.topic]){const item=new Option(state.topic,state.topic);item.dataset.custom='true';select.add(item,select.options.length-1);}select.value=state.topic;$('strategy-select').value=state.strategy;
-    document.documentElement.dataset.theme=state.theme==='dark'?'dark':'light';document.querySelectorAll('meta[name="theme-color"]').forEach(tag=>tag.content=state.theme==='dark'?'#17181c':'#f8f7f4');
+    if(!Object.hasOwn(themes,state.theme))state.theme='light';
+    document.documentElement.dataset.theme=state.theme;
+    document.querySelector('meta[name="theme-color"]').content=themes[state.theme].color;
+    $('theme-label').textContent=themes[state.theme].name;
+    document.querySelectorAll('[data-action="set-theme"]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.value===state.theme)));
+    $('home-topic').textContent=state.topic;$('practice-topic').textContent=state.topic;
+    $('strategy-description').textContent={A:'把已收藏的词汇带回表达中，让好词真正用得出来。',B:'遇见新的词汇与搭配，拓宽表达的可能。',C:'把已收藏的表达用熟，再遇见一些新搭配。'}[state.strategy];
+    renderEntry();
   }
-  function renderGeneration(){const busy=generationBusy.has(contextKey());$('generation-status').classList.toggle('error',!!generationError);$('generation-status').innerHTML=busy?'<span class="spinner"></span> 正在后台准备下一道题，你可以继续作答':generationError?`${icon('circle-alert')}<span>${e(generationError)}</span><button data-action="generate">重试</button>`:'';icons();}
+  function renderEntry(){const q=current(),hasDraft=!!(q?.answer.trim()||q?.review);$('home-start-label').textContent=hasDraft?'继续上次练习':'进入练习';$('home-session-note').textContent=hasDraft?'上次的思路还在，接着写下去。':state.mode==='writing'?'90 秒，留给一句更好的表达。':'20 秒，把脑海里的想法自然说出来。';}
+  function renderGeneration(){const busy=generationBusy.has(contextKey()),showError=!!generationError&&(generationErrorRequested||!current());$('generation-status').classList.toggle('error',showError);$('generation-status').innerHTML=showError?`${icon('circle-alert')}<span>${e(generationError)}</span><button data-action="generate">重试</button>`:busy&&!current()?'<span class="spinner"></span> 正在准备下一道题…':'';icons();}
+  function showView(view,animate=false){
+    if(view===activeView)return;
+    if(view==='home'){pauseTimer();stopSpeech();}
+    viewAnimation?.cancel();activeView=view;
+    $('home-view').hidden=view!=='home';$('practice-view').hidden=view!=='practice';
+    document.documentElement.dataset.view=view;
+    document.title=view==='practice'?'专注练习 · PASSETS':'PASSETS · 给表达一点空间';
+    renderEntry();if(view==='practice')renderExercise();
+    window.scrollTo({top:0,behavior:'instant'});
+    const surface=$(view+'-view');
+    if(animate){
+      (view==='home'?$('home-title'):surface).focus({preventScroll:true});
+      if(!document.documentElement.classList.contains('keyboard-action'))viewAnimation=surface.animate([{opacity:0,transform:'translateY(8px)'},{opacity:1,transform:'translateY(0)'}],{duration:220,easing:'cubic-bezier(.23,1,.32,1)'});
+    }
+  }
+  function navigate(view){if(location.hash!=='#'+view)history.pushState(null,'','#'+view);showView(view,true);window.scrollTo({top:0,behavior:'instant'});}
+  function routeFromLocation(){if(location.hash==='#practice')return 'practice';if(!location.hash||location.hash==='#home')return 'home';return activeView||'home';}
   function render(){renderControls();renderExercise();renderStats();renderGeneration();}
   function apiConfig(form=false){const f=$('settings-form');return form?{baseUrl:f.elements.baseUrl.value.trim(),apiKey:f.elements.apiKey.value.trim(),model:f.elements.model.value.trim(),sound:f.elements.sound.checked}:settings;}
   function validateConfig(config){
@@ -105,8 +130,8 @@
     const ctx={...context()};if(target)ctx.strategy='A';ctx.required=chooseRequired(ctx,target);
     const key=contextKey(ctx);if(generationBusy.has(key)){if(focus)toast('该话题已有一道题正在生成。');return generationBusy.get(key);}
     if(!force&&!focus&&state.activeQueue.filter(q=>matches(q,ctx)).length>1)return;
-    if(ctx.strategy==='A'&&!ctx.required.length){generationError='好词库还是空的。先收藏词汇，再使用词库巩固。';renderGeneration();return;}
-    const origin=contextKey(),token={};lastGeneratedContext=token;generationError='';let succeeded=false;
+    if(ctx.strategy==='A'&&!ctx.required.length){generationError='好词库还是空的。先收藏词汇，再使用词库巩固。';generationErrorRequested=focus;renderGeneration();return;}
+    const origin=contextKey(),token={};lastGeneratedContext=token;generationError='';generationErrorRequested=false;let succeeded=false;
     const work=(async()=>{
       // Defer work by one microtask so the single-flight lock is established first.
       await Promise.resolve();renderGeneration();if(!current())renderExercise();
@@ -121,7 +146,7 @@
         if(canFocus){pauseTimer();stopSpeech();state.mode=q.mode;state.topic=q.topic;state.strategy=q.strategy;state.activeQueue.unshift(q);state.currentIndex=0;}
         else{state.activeQueue.push(q);if(!current()&&matches(q)){state.currentIndex=state.activeQueue.length-1;}}
         succeeded=true;persist();generationError='';render();if(canFocus)toast(target?`已生成「${target}」定向练习`:'新题已准备好，原有草稿已保留');
-      }catch(error){if(contextKey()===origin){generationError=error.message;renderGeneration();if(!current())renderExercise();}if(focus)toast(error.message);}
+      }catch(error){if(contextKey()===origin){generationError=error.message;generationErrorRequested=focus;renderGeneration();if(!current())renderExercise();}if(focus)toast(error.message);}
       finally{generationBusy.delete(key);renderGeneration();if(!current())renderExercise();if(succeeded&&contextKey()===key&&state.activeQueue.filter(q=>matches(q)).length<=1)ensureNext();}
     })();generationBusy.set(key,work);renderGeneration();return work;
   }
@@ -166,14 +191,29 @@
     const query=$('vocab-search').value.toLowerCase().trim(),sort=$('vocab-sort').value;
     const words=state.vocabBank.filter(v=>`${v.word} ${v.def}`.toLowerCase().includes(query)).sort((a,b)=>sort==='az'?a.word.localeCompare(b.word,'en'):b.createdAt.localeCompare(a.createdAt));
     $('vocab-dialog-count').textContent=`${state.vocabBank.length} 个表达`;
-    $('vocab-list').innerHTML=words.length?words.map(v=>`<article class="word-card"><div class="word-card-top"><h3 lang="en">${e(v.word)}</h3>${v.pos?`<span class="pos">${e(v.pos)}</span>`:''}</div><p class="definition">${e(v.def||'释义尚未补全')}</p><p class="example" lang="en">${e(v.example||'例句尚未补全')}</p>${v.metadataStatus!=='ready'?`<div class="metadata-status">${v.metadataStatus==='loading'?'<span class="spinner"></span> 正在补全词条':`补全需要有效 API <button class="text-button" data-action="retry-word" data-id="${e(v.id)}">重试</button>`}</div>`:''}<div class="word-meta"><span>${e(new Date(v.createdAt).toLocaleDateString('zh-CN'))} 收藏</span><button class="button secondary" data-action="target-word" data-id="${e(v.id)}">${icon('crosshair')} 用此词出题练习</button></div></article>`).join(''):`<div class="empty-state">${icon(query?'search-x':'sparkles')}<h3>${query?'暂时没有匹配的词汇':'让好表达，真正属于你。'}</h3><p>${query?'试试其他关键词。':'点击练习提示或批改结果里的紫色词汇，<br>开启你的第一份语言资产。'}</p></div>`;icons();
+    $('vocab-list').innerHTML=words.length?words.map(v=>`<article class="word-card"><div class="word-card-top"><h3 lang="en">${e(v.word)}</h3>${v.pos?`<span class="pos">${e(v.pos)}</span>`:''}</div><p class="definition">${e(v.def||'释义尚未补全')}</p><p class="example" lang="en">${e(v.example||'例句尚未补全')}</p>${v.metadataStatus!=='ready'?`<div class="metadata-status">${v.metadataStatus==='loading'?'<span class="spinner"></span> 正在补全词条':`补全需要有效 API <button class="text-button" data-action="retry-word" data-id="${e(v.id)}">重试</button>`}</div>`:''}<div class="word-meta"><span>${e(new Date(v.createdAt).toLocaleDateString('zh-CN'))} 收藏</span><button class="button secondary" data-action="target-word" data-id="${e(v.id)}">${icon('crosshair')} 用此词出题练习</button></div></article>`).join(''):`<div class="empty-state">${icon(query?'search-x':'sparkles')}<h3>${query?'暂时没有匹配的词汇':'让好表达，真正属于你。'}</h3><p>${query?'试试其他关键词。':'点击练习提示或批改结果里的高亮词汇，<br>开启你的第一份语言资产。'}</p></div>`;icons();
   }
   function renderHistory(){
     const query=$('history-search').value.toLowerCase().trim();const records=state.historyQueue.filter(q=>`${q.chinese} ${q.answer} ${q.topic}`.toLowerCase().includes(query));
     $('history-list').innerHTML=records.length?records.map(q=>`<article class="history-card"><div class="history-meta"><span>${e(q.topic)} · ${q.mode==='writing'?'Writing':'Speaking'}</span><span>${e(new Date(q.completedAt).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}))}</span></div><h3>${e(q.chinese)}</h3><details><summary>查看作答与${q.review?.kind==='ai'?`批改 · Band ${q.review.overallBand}`:'自评记录'}</summary><p class="history-answer"><span class="result-label">当时作答</span>${e(q.answer)}</p><p class="history-upgrade"><span class="result-label">${q.review?.kind==='ai'?'升格润色句':'参考表达'}</span>${e(q.review?.upgradedSentence||q.reference)}</p>${q.review?.kind==='ai'?`<p class="history-upgrade">LR ${q.review.lrScore} · GRA ${q.review.graScore}<br>${e(q.review.targetHit.comment)}</p>${q.review.corrections.map(c=>`<p class="history-upgrade">${e(c.original)} → ${e(c.corrected)}<br>${e(c.explanation)}</p>`).join('')}`:`<p class="history-upgrade">自评：${e({again:'需要再练',good:'基本掌握',great:'熟练运用'}[q.selfRating]||'未记录')}</p>`}</details><button class="button secondary" data-action="restore" data-id="${e(q.id)}">${icon('rotate-ccw')} 放回练习队列</button></article>`).join(''):`<div class="empty-state">${icon(query?'search-x':'history')}<h3>${query?'没有匹配的练习':'你的进步，会被好好记录。'}</h3><p>${query?'试试其他搜索词。':'完成批改或自评后，点击「完成并下一题」，<br>作答与反馈会自动归档到这里。'}</p></div>`;icons();
   }
-  function openDialog(id){const dialog=$(id);if(dialog.open)return;dialog.classList.remove('leaving');dialog.classList.add('entering');dialog.showModal();requestAnimationFrame(()=>requestAnimationFrame(()=>dialog.classList.remove('entering')));}
-  function closeDialog(dialog){if(!dialog||closing.has(dialog))return;closing.add(dialog);dialog.classList.add('leaving');setTimeout(()=>{dialog.close();dialog.classList.remove('leaving');closing.delete(dialog);},document.documentElement.classList.contains('keyboard-action')?0:270);}
+  function hideThemeMenu(){if($('theme-menu').matches(':popover-open'))$('theme-menu').hidePopover();}
+  function openDialog(id){
+    hideThemeMenu();const dialog=$(id),pending=closing.get(dialog);
+    if(pending){clearTimeout(pending.timer);closing.delete(dialog);dialog.classList.remove('leaving');pending.resolve();return;}
+    if(dialog.open)return;
+    dialog.classList.remove('leaving');dialog.classList.add('entering');dialog.showModal();
+    requestAnimationFrame(()=>requestAnimationFrame(()=>dialog.classList.remove('entering')));
+  }
+  function closeDialog(dialog){
+    if(!dialog?.open)return Promise.resolve();
+    if(closing.has(dialog))return closing.get(dialog).promise;
+    dialog.classList.add('leaving');
+    let resolve;const promise=new Promise(done=>{resolve=done;});
+    const timer=setTimeout(()=>{dialog.close();dialog.classList.remove('leaving');closing.delete(dialog);resolve();},document.documentElement.classList.contains('keyboard-action')?0:240);
+    closing.set(dialog,{timer,promise,resolve});return promise;
+  }
+  function closeOpenDialogs(){return Promise.all([...document.querySelectorAll('dialog[open]')].map(dialog=>closeDialog(dialog)));}
   function openSettings(){const f=$('settings-form');for(const key of ['baseUrl','apiKey','model'])f.elements[key].value=settings[key];f.elements.sound.checked=settings.sound;$('connection-status').textContent='';openDialog('settings-dialog');}
   function exportData(){const blob=new Blob([JSON.stringify({format:'passets-backup',exportedAt:new Date().toISOString(),state},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`passets-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('备份已导出，不包含 API Key。');}
   async function importData(file){if(!file)return;try{if(file.size>10000000)throw new Error('备份文件超过 10 MB，请选择较小的文件。');const data=JSON.parse(await file.text());if(data.format!=='passets-backup')throw new Error('请选择 PASSETS 导出的备份。');const incoming=C.validateState(data.state);
@@ -183,12 +223,13 @@
     }catch(error){toast(error.message);}finally{$('import-file').value='';}}
   document.addEventListener('click',async event=>{
     const button=event.target.closest('[data-action]');if(!button||button.disabled)return;const action=button.dataset.action,q=current();
-    if(action==='practice'){document.querySelectorAll('dialog[open]').forEach(closeDialog);window.scrollTo({top:0,behavior:'instant'});}
+    if(action==='practice'||action==='home'){event.preventDefault();hideThemeMenu();await closeOpenDialogs();navigate(action==='practice'?'practice':'home');}
     else if(action==='settings')openSettings();
+    else if(action==='preferences')openDialog('practice-controls');
     else if(action==='vocab'){$('vocab-sort').value=state.vocabSort||'newest';renderVocab();openDialog('vocab-dialog');}
     else if(action==='history'){renderHistory();openDialog('history-dialog');}
     else if(action==='close')closeDialog(button.closest('dialog'));
-    else if(action==='theme'){state.theme=state.theme==='dark'?'light':'dark';persist();renderControls();}
+    else if(action==='set-theme'&&Object.hasOwn(themes,button.dataset.value)){state.theme=button.dataset.value;persist();renderControls();}
     else if(action==='mode'&&state.mode!==button.dataset.value)changeContext({mode:button.dataset.value});
     else if(action==='generate')await generate({focus:true,force:true});
     else if(action==='submit')await submit();
@@ -202,8 +243,8 @@
     else if(action==='speech')speechInput();
     else if(action==='save-word')saveWord(unpack(button.dataset.phrase));
     else if(action==='retry-word')completeWord(button.dataset.id);
-    else if(action==='target-word'){const v=state.vocabBank.find(v=>v.id===button.dataset.id);if(v){document.querySelectorAll('dialog[open]').forEach(closeDialog);await generate({focus:true,target:v.word,force:true});}}
-    else if(action==='restore'){try{pauseTimer();stopSpeech();C.restoreQuestion(state,button.dataset.id);persist();render();closeDialog($('history-dialog'));toast('已加入队列首位，原作答记录仍保留。');ensureNext();}catch(error){toast(error.message);}}
+    else if(action==='target-word'){const v=state.vocabBank.find(v=>v.id===button.dataset.id);if(v){await closeOpenDialogs();navigate('practice');await generate({focus:true,target:v.word,force:true});}}
+    else if(action==='restore'){try{pauseTimer();stopSpeech();C.restoreQuestion(state,button.dataset.id);persist();render();await closeDialog($('history-dialog'));navigate('practice');toast('已加入队列首位，原作答记录仍保留。');ensureNext();}catch(error){toast(error.message);}}
     else if(action==='toggle-key'){const input=$('settings-form').elements.apiKey;input.type=input.type==='password'?'text':'password';}
     else if(action==='test-api'){
       const node=$('connection-status');node.className='';node.textContent='正在验证模型与 JSON 输出能力…';button.disabled=true;
@@ -224,14 +265,23 @@
   });
   document.addEventListener('keydown',event=>{
     document.documentElement.classList.add('keyboard-action');
-    if((event.ctrlKey||event.metaKey)&&event.key==='Enter'&&!document.querySelector('dialog[open]')){event.preventDefault();submit();}
+    if((event.ctrlKey||event.metaKey)&&event.key==='Enter'&&activeView==='practice'&&!document.querySelector('dialog[open]')){event.preventDefault();submit();}
   });
   document.addEventListener('pointerdown',()=>document.documentElement.classList.remove('keyboard-action'));
   window.addEventListener('storage',event=>{if(event.key===C.STORAGE_KEY&&event.newValue){try{const incoming=C.validateState(JSON.parse(event.newValue));state=incoming;storageConflict=false;render();toast('已同步另一标签页的最新进度。');}catch{storageConflict=true;toast('另一标签页的数据格式异常，已暂停保存以避免覆盖。');}}});
   window.addEventListener('pagehide',()=>{stopSpeech();persist();});
   window.addEventListener('pageshow',updateTimer);
-  if(window.matchMedia('(max-width:700px)').matches)$('practice-controls').open=false;
+  function positionThemeMenu(){
+    const trigger=$('theme-trigger').getBoundingClientRect(),width=Math.min(310,innerWidth-32),menu=$('theme-menu');
+    menu.style.left=`${Math.max(16,Math.min(trigger.right-width,innerWidth-width-16))}px`;
+    menu.style.top=`${trigger.bottom+10}px`;menu.style.right='auto';
+    menu.style.maxHeight=`${Math.max(120,innerHeight-trigger.bottom-26)}px`;
+  }
+  $('theme-menu').addEventListener('beforetoggle',event=>{if(event.newState==='open')positionThemeMenu();});
+  window.addEventListener('resize',()=>{if($('theme-menu').matches(':popover-open'))positionThemeMenu();});
+  window.addEventListener('popstate',()=>{hideThemeMenu();closeOpenDialogs().then(()=>showView(routeFromLocation(),true));});
+  window.addEventListener('hashchange',()=>showView(routeFromLocation(),true));
   // Persist only after loading valid state. Never replace an unreadable saved record.
-  render();persist();ensureNext();if(settings.apiKey)resumeMetadata();setInterval(updateTimer,500);
+  render();showView(routeFromLocation());persist();ensureNext();if(settings.apiKey)resumeMetadata();setInterval(updateTimer,500);
   window.PassetsApp={getState:()=>structuredClone(state),generate,submit};
 })();

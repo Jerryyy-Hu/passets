@@ -1,6 +1,6 @@
 # PASSETS
 
-An IELTS speaking and writing workspace that turns sentence practice into reusable vocabulary assets. Built with HTML, Tailwind CSS CDN, native JavaScript and Lucide icons. No build step, backend, package installation or application framework is required.
+An IELTS speaking and writing workspace that turns sentence practice into reusable vocabulary assets. Built with HTML, CSS, native JavaScript and Lucide icons. No build step, backend, package installation or application framework is required.
 
 **Live site:** https://jerryyy-hu.github.io/passets/
 
@@ -30,6 +30,9 @@ API requests are sent directly to the configured provider. Keys are stored in th
 
 ## Practice workflow
 
+- **Home and focus:** the homepage provides one entry into practice, mode selection and a compact progress summary. Practice uses a centered, single-column surface for the current question, answer and review. Topic and strategy controls live in a slide-out preferences panel. Returning home pauses the timer and preserves the draft; entering practice resumes the same question. Browser Back/Forward and direct `#practice` links are supported.
+- **Appearance:** the upper-right theme picker offers Paper, Sage, Mist, Dusk and Graphite. The choice persists across reloads and applies to the entire workspace, feedback and dialogs. Switching themes preserves the active answer element and its text selection. Existing light/dark preferences remain compatible.
+- **Motion:** a sliding indicator follows Writing/Speaking selection; preferences, vocabulary and history slide in from the right. Theme choices and page navigation use brief transitions. Functional reading and typing surfaces remain stable. Pointer-driven transitions take 180–240 ms; keyboard actions update immediately.
 - **Writing:** a 90-second wall-clock timer, browser spell-check and live word/character counts. **Speaking:** a 20-second timer and Web Speech API dictation, when supported by the browser. The first focus or input starts the timer; pause and reset are available. Reaching zero gives a visual warning and an optional sound without discarding or submitting the answer.
 - Choose one of six fixed topics or supply a custom topic. Modes and topics retain separate unfinished questions and drafts in the shared active queue.
 - **A — Consolidate:** use one or two saved vocabulary terms. **B — Expand:** exclude all saved terms from the reference and introduce new collocations. **C — Mix:** use a saved term plus at least one new collocation; an empty bank starts with new vocabulary. AI-generated questions are validated against these constraints before entering the queue.
@@ -41,19 +44,19 @@ API requests are sent directly to the configured provider. Keys are stored in th
 
 ## Vocabulary assets
 
-Click a purple vocabulary capsule in hints or review. Entries include `id`, `word`, `pos`, `def`, `example` and `createdAt`; duplicate terms are prevented case-insensitively. Missing definitions/examples are completed asynchronously with AI. If unavailable, the word remains saved with a visible retry state.
+Click an accented vocabulary capsule in hints or review. Entries include `id`, `word`, `pos`, `def`, `example` and `createdAt`; duplicate terms are prevented case-insensitively. Missing definitions/examples are completed asynchronously with AI. If unavailable, the word remains saved with a visible retry state.
 
 The vocabulary drawer supports live search, newest-first/A–Z sorting and targeted practice. Targeted generation puts a fresh question at the front while retaining the existing draft. Backups contain questions, completed attempts, vocabulary and preferences. Import merges by ID without overwriting existing unfinished answers. API settings are excluded.
 
 ## Word-level comparison
 
-`core.js` implements dynamic-programming LCS. Longest matching preset collocations are tokenized as atomic phrases, including hyphenated terms. Remaining differences are individual words, never a whole-sentence replacement blob. Identical tokens are green, removed content words are red and struck through, replacement content words are purple and clickable. Function words and punctuation remain visible in neutral styling for grammatical context but are excluded from the replacement vocabulary bank.
+`core.js` implements dynamic-programming LCS. Longest matching preset collocations are tokenized as atomic phrases, including hyphenated terms. Remaining differences are individual words, never a whole-sentence replacement blob. Identical tokens are green, removed content words are red and struck through, replacement content words use the theme accent and are clickable. Function words and punctuation remain visible in neutral styling for grammatical context but are excluded from the replacement vocabulary bank.
 
 ## Persistence and accessibility
 
 Practice state uses `passets.workspace.v1`; API settings use `passets.settings.v1`. Draft input, current queue position, hints, review, self-rating and timer deadlines are saved as they change. Refresh restores the same attempt, including reviewed-but-not-yet-archived work. Concurrent tabs synchronize storage updates. Storage failures are reported instead of being presented as successful saves.
 
-Drawers/settings use native modal dialogs with browser focus trapping and Escape support. The UI includes light/dark themes, semantic labels, reduced-motion handling, safe-area padding, dynamic viewport units, 16px mobile inputs, touch press feedback and capability-gated hover styles. Mobile controls collapse to reduce clutter.
+Drawers/settings use native modal dialogs with browser focus trapping and Escape support. Theme choices use a native popover with light dismissal. The UI includes five themes, semantic labels, safe-area padding, dynamic viewport units, 16px mobile inputs, touch press feedback and capability-gated hover styles.
 
 Web Speech API availability, microphone permissions and recognition services depend on the browser/device. Real-phone verification is still needed for microphone behavior, software keyboards, safe-area rendering and touch feel; desktop viewport emulation cannot establish those properties.
 
@@ -74,7 +77,7 @@ Browser checks use an existing Playwright installation and Microsoft Edge. They 
 node tests/browser.test.cjs /absolute/path/to/playwright
 ```
 
-Set `PASSETS_URL` to test a different local server or the deployed site. Tests cover reload recovery, archiving, repractice, independent mode drafts, vocabulary deduplication/search/sort, custom topics, targeted generation, API error recovery, keyboard submission, responsive geometry and dark/reduced-motion behavior. Mocked API tests exercise frontend behavior without claiming provider reliability. Screenshots/results are written to ignored `.local/`.
+Set `PASSETS_URL` to test a different local server or the deployed site. Tests cover homepage entry, browser navigation, timer pausing, reload recovery, archiving, repractice, independent mode drafts, vocabulary deduplication/search/sort, custom topics, targeted generation, API error recovery, keyboard submission and all five persistent themes without replacing the answer or cursor. Geometry checks cover 320, 390, 600, 768, 1024 and 1440 pixel widths. Mocked API tests exercise frontend behavior without claiming provider reliability. Screenshots/results are written to ignored `.local/`.
 
 GitHub Actions runs JavaScript syntax checks and the dependency-free core suite. GitHub Pages serves the repository root on `main`; `.nojekyll` avoids processing the static application.
 

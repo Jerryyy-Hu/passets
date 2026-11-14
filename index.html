@@ -1,58 +1,156 @@
 <!doctype html>
-<html lang="zh-CN" data-theme="light">
+<html lang="zh-CN" data-theme="light" data-view="home">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
-  <meta name="description" content="PASSETS — 将每一次雅思表达练习，变成你的语言资产。">
+  <meta name="description" content="PASSETS — 一个安静的雅思表达练习空间。专注一句，积累一点。">
   <meta name="color-scheme" content="light dark">
-  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f8f7f4">
-  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#17181c">
-  <title>PASSETS · 你的表达，值得进阶</title>
+  <meta name="theme-color" content="#f7f5ef">
+  <title>PASSETS · 给表达一点空间</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
-  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
-  <script>tailwind.config = {corePlugins: {preflight: false}};</script>
+  <script>
+    try {
+      const theme = JSON.parse(localStorage.getItem('passets.workspace.v1') || '{}').theme;
+      if (['light', 'sage', 'mist', 'dusk', 'dark'].includes(theme)) document.documentElement.dataset.theme = theme;
+    } catch {}
+  </script>
   <script defer src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
   <link rel="stylesheet" href="./styles.css">
   <script defer src="./core.js"></script>
   <script defer src="./app.js"></script>
 </head>
 <body>
+  <a class="skip-link" href="#main-content">跳到主要内容</a>
   <div class="app-shell">
-    <aside class="sidebar" aria-label="主导航">
-      <a class="brand" href="./" aria-label="PASSETS 首页"><span class="brand-mark"><i data-lucide="layers-2"></i></span><span>PASSETS<span class="brand-dot">.</span></span></a>
-      <div class="workspace-label">YOUR LANGUAGE WORKSPACE</div>
-      <nav class="main-nav">
-        <button class="nav-item selected" data-action="practice"><i data-lucide="panels-top-left"></i><span>表达练习</span><span class="nav-live"></span></button>
-        <button class="nav-item" data-action="vocab"><i data-lucide="sparkles"></i><span>好词库</span><span id="nav-vocab-count" class="count">0</span></button>
-        <button class="nav-item" data-action="history"><i data-lucide="history"></i><span>历史记录</span></button>
+    <header class="topbar">
+      <a class="brand" href="#home" data-action="home" aria-label="PASSETS 首页">
+        <span class="brand-mark" aria-hidden="true"><i data-lucide="layers-2"></i></span>
+        <span>PASSETS<span class="brand-dot">.</span></span>
+      </a>
+      <span class="brand-caption">A LITTLE PRACTICE. A LASTING CHANGE.</span>
+      <nav class="main-nav" aria-label="主导航">
+        <button class="nav-item selected" data-action="home" aria-current="page">首页</button>
+        <button class="nav-item" data-action="vocab">好词库 <span id="nav-vocab-count" class="count">0</span></button>
+        <button class="nav-item history-top" data-action="history">历史记录</button>
       </nav>
-      <div class="sidebar-note"><div class="tiny-stars">✦ &nbsp; ✧</div><h3>Small practice.<br>Lasting progress.</h3><p>让每一次练习，<br>成为下一次表达的底气。</p><div class="note-line"></div><span>ONE SENTENCE AT A TIME</span></div>
-      <div class="sidebar-bottom"><button class="nav-item" data-action="settings"><i data-lucide="sliders-horizontal"></i><span>API 与偏好设置</span></button><div class="profile"><span class="avatar">P</span><div><strong>My workspace</strong><small>Personal learning space</small></div><span class="local-dot" title="保存在此浏览器"></span></div></div>
-    </aside>
-    <div class="main-shell">
-      <header class="topbar"><div class="breadcrumb"><span class="mobile-brand">PASSETS<span>.</span></span><span class="desktop-breadcrumb">Workspace <i data-lucide="chevron-right"></i> <strong>表达练习</strong></span></div><div class="top-actions"><span id="save-status" class="save-status"><span class="local-dot"></span> 已保存到本地</span><button class="button quiet history-top" data-action="history"><i data-lucide="history"></i><span>历史记录</span></button><button class="icon-button" data-action="theme" aria-label="切换深浅色主题"><i data-lucide="sun-moon"></i></button><button class="icon-button" data-action="settings" aria-label="打开 API 设置"><i data-lucide="settings-2"></i></button></div></header>
-      <main>
-        <section class="page-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> THE DAILY PRACTICE</div><h1>你的表达，值得进阶<span class="heading-spark">✳</span></h1><p>从想法到地道表达。练一句，积累一点。</p></div><div class="streak-chip"><i data-lucide="flame"></i><div><strong id="practice-days">0 天</strong><span>累计练习</span></div></div></section>
-        <div class="workspace-grid"><div class="practice-column">
-          <section class="mode-bar"><div class="segmented" role="group" aria-label="练习模式"><button id="writing-tab" data-action="mode" data-value="writing"><i data-lucide="pen-line"></i> Writing <span>写作</span></button><button id="speaking-tab" data-action="mode" data-value="speaking"><i data-lucide="mic"></i> Speaking <span>口语</span></button></div><span class="mode-caption" id="mode-caption">把准确的意思，写得更出色。</span></section>
-          <details class="practice-controls" id="practice-controls" open><summary><span><i data-lucide="sliders-horizontal"></i> 练习偏好</span><i data-lucide="chevron-down"></i></summary><div class="control-fields"><label><span>练习话题</span><select id="topic-select" aria-label="练习话题"><option>科技与教育</option><option>全球化</option><option>环境保护</option><option>健康与体育</option><option>工作与生活</option><option>文化与社会</option><option value="custom">＋ 自定义话题</option></select></label><label><span>出题策略</span><select id="strategy-select" aria-label="出题策略"><option value="C">混合模式 · 巩固 + 拓展</option><option value="A">词库巩固 · 使用已收藏词</option><option value="B">拓展新题 · 避开已收藏词</option></select></label><button class="icon-button refresh-question" data-action="generate" title="生成一道新题（保留当前草稿）" aria-label="生成一道新题"><i data-lucide="refresh-cw"></i></button></div><form id="custom-topic-form" class="custom-topic" hidden><input id="custom-topic-input" maxlength="80" aria-label="自定义话题" placeholder="输入你感兴趣的话题，例如城市规划"><button class="button primary" type="submit">切换话题</button></form></details>
-          <div id="generation-status" class="generation-status" role="status"></div>
-          <section class="exercise-card" id="exercise-card" aria-label="当前练习"></section>
-          <section id="result-section" class="result-section" aria-label="批改与比对结果" hidden></section>
-          <div class="practice-footnote"><span><i data-lucide="lock-keyhole"></i> 练习与词库保存在此浏览器</span><span>PROGRESS, NOT PERFECTION.</span></div>
-        </div><aside class="insight-column">
-          <section class="progress-card"><div class="section-overline">YOUR PROGRESS <i data-lucide="chart-no-axes-combined"></i></div><h2>每一小步，都算数。</h2><div class="progress-stats"><div><strong id="completed-count">0<span>句</span></strong><span>累计完成</span></div><div><strong id="asset-count">0<span>个</span></strong><span>词汇资产</span></div></div><div class="goal-heading"><span>今日小目标</span><strong id="daily-count">0 / 5</strong></div><div class="goal-track"><span id="goal-progress"></span></div><p id="goal-message">从一句开始，找到表达的手感。</p><div class="weekly-bars" id="weekly-bars" aria-label="最近七天练习统计"></div></section>
-          <section class="assets-preview"><div class="rail-heading"><h2><i data-lucide="sparkles"></i> 我的好词库</h2><button class="text-button" data-action="vocab">全部 <i data-lucide="arrow-up-right"></i></button></div><p class="rail-subtitle">收藏的每个词，都是你的表达资产。</p><div id="vocab-preview"></div><button class="button asset-open" data-action="vocab"><i data-lucide="plus"></i> 探索我的词汇资产</button></section>
-          <section class="how-card"><span class="how-icon"><i data-lucide="lightbulb"></i></span><div><h3>不止学会，更要用出来。</h3><p>点击紫色词汇即可收藏。下次练习，让好词自然出现在你的表达里。</p></div></section>
-          <div class="rail-footer"><span class="mini-mark">✳</span> MAKE WORDS YOUR ASSETS.</div>
-        </aside></div>
-      </main>
-      <footer class="mobile-nav"><button class="selected" data-action="practice"><i data-lucide="pen-line"></i><span>练习</span></button><button data-action="vocab"><i data-lucide="sparkles"></i><span>好词库</span></button><button data-action="history"><i data-lucide="history"></i><span>历史</span></button></footer>
-    </div>
+      <button class="back-home" data-action="home"><i data-lucide="arrow-left"></i><span>返回主页</span></button>
+      <div class="top-actions">
+        <button id="theme-trigger" class="theme-trigger" data-action="theme" popovertarget="theme-menu" aria-label="切换配色主题">
+          <span class="theme-dot" aria-hidden="true"></span><span id="theme-label">暖纸</span><i data-lucide="chevron-down"></i>
+        </button>
+        <span class="header-divider" aria-hidden="true"></span>
+        <button class="icon-button" data-action="settings" aria-label="打开 API 设置" title="API 与偏好设置"><i data-lucide="settings-2"></i></button>
+      </div>
+    </header>
+
+    <main id="main-content" tabindex="-1">
+      <section id="home-view" class="home-view" aria-labelledby="home-title">
+        <div class="hero-grid">
+          <div class="hero-copy">
+            <div class="eyebrow"><span class="eyebrow-line"></span> YOUR QUIET LANGUAGE SPACE</div>
+            <h1 id="home-title" tabindex="-1">让每一句，<br><em>都更进一步。</em></h1>
+            <p class="hero-description">给表达一点空间。<br>从一句开始，把想法变成自然、准确的英文。</p>
+            <div class="hero-signature"><span class="signature-line"></span><span>ONE SENTENCE AT A TIME</span></div>
+          </div>
+          <section class="entry-card" aria-label="进入表达练习">
+            <div class="entry-heading"><span class="eyebrow">MAKE ROOM FOR PROGRESS</span><span class="entry-symbol" aria-hidden="true">✳</span></div>
+            <h2>今天，从这里开始。</h2>
+            <div class="segmented" data-mode="writing" role="group" aria-label="主页练习模式">
+              <span class="segmented-indicator" aria-hidden="true"></span>
+              <button id="home-writing-tab" data-action="mode" data-value="writing" aria-pressed="true"><i data-lucide="pen-line"></i> Writing <span>写作</span></button>
+              <button id="home-speaking-tab" data-action="mode" data-value="speaking" aria-pressed="false"><i data-lucide="mic"></i> Speaking <span>口语</span></button>
+            </div>
+            <p id="mode-caption" class="mode-caption">把准确的意思，写得更出色。</p>
+            <button class="entry-preferences" data-action="preferences" aria-haspopup="dialog">
+              <span><i data-lucide="sliders-horizontal"></i><span id="home-topic">科技与教育</span></span><span>练习偏好 <i data-lucide="arrow-up-right"></i></span>
+            </button>
+            <button id="start-practice" class="button primary start-button" data-action="practice"><span id="home-start-label">进入练习</span><i data-lucide="arrow-right"></i></button>
+            <p class="entry-note" id="home-session-note">90 秒，留给一句更好的表达。</p>
+          </section>
+        </div>
+        <section class="home-progress" aria-label="练习进度">
+          <div class="progress-intro"><span class="eyebrow">LITTLE BY LITTLE</span><h2>每一小步，都算数。</h2></div>
+          <div class="progress-stat"><strong id="completed-count">0<span>句</span></strong><span>累计完成</span></div>
+          <div class="progress-stat"><strong id="asset-count">0<span>个</span></strong><span>词汇资产</span></div>
+          <div class="progress-stat"><strong id="practice-days">0 天</strong><span>练习天数</span></div>
+          <div class="daily-goal"><div class="goal-heading"><span>今日小目标</span><strong id="daily-count">0 / 5</strong></div><div class="goal-track"><span id="goal-progress"></span></div><p id="goal-message">从一句开始，找到表达的手感。</p></div>
+        </section>
+        <footer class="home-footer"><span>PRACTICE. COLLECT. MAKE IT YOURS.</span><span><i data-lucide="lock-keyhole"></i> 练习与词库保存在此浏览器</span></footer>
+      </section>
+
+      <section id="practice-view" class="practice-view" aria-label="专注表达练习" tabindex="-1" hidden>
+        <div class="practice-toolbar">
+          <div class="segmented" data-mode="writing" role="group" aria-label="练习模式">
+            <span class="segmented-indicator" aria-hidden="true"></span>
+            <button id="writing-tab" data-action="mode" data-value="writing" aria-pressed="true"><i data-lucide="pen-line"></i> Writing <span>写作</span></button>
+            <button id="speaking-tab" data-action="mode" data-value="speaking" aria-pressed="false"><i data-lucide="mic"></i> Speaking <span>口语</span></button>
+          </div>
+          <div class="practice-toolbar-actions">
+            <button class="preference-trigger" data-action="preferences" aria-haspopup="dialog"><i data-lucide="sliders-horizontal"></i><span id="practice-topic">科技与教育</span><i data-lucide="chevron-down"></i></button>
+            <button class="icon-button refresh-question" data-action="generate" aria-label="生成一道新题" title="生成一道新题，保留当前草稿"><i data-lucide="refresh-cw"></i></button>
+          </div>
+        </div>
+        <section class="exercise-card" id="exercise-card" aria-label="当前练习"></section>
+        <section id="result-section" class="result-section" aria-label="批改与比对结果" hidden></section>
+        <div id="generation-status" class="generation-status" role="status"></div>
+        <footer class="practice-footnote"><span id="save-status" class="save-status"><span class="local-dot"></span> 已保存到本地</span><span>专注当下这一句。</span></footer>
+      </section>
+    </main>
   </div>
-  <dialog id="vocab-dialog" class="drawer" aria-labelledby="vocab-title"><div class="dialog-header"><div><div class="eyebrow">YOUR WORD ASSETS</div><h2 id="vocab-title">好词库 <span id="vocab-dialog-count"></span></h2></div><button class="icon-button" data-action="close" aria-label="关闭好词库"><i data-lucide="x"></i></button></div><div class="drawer-toolbar"><label class="search-box"><i data-lucide="search"></i><input id="vocab-search" type="search" placeholder="搜索单词、释义" aria-label="搜索好词库"></label><select id="vocab-sort" aria-label="好词库排序"><option value="newest">最新添加</option><option value="az">字母 A–Z</option></select></div><div id="vocab-list" class="drawer-content"></div><div class="drawer-bottom"><button class="button quiet" data-action="export"><i data-lucide="download"></i> 备份练习数据</button><label class="button quiet import-label"><i data-lucide="upload"></i> 导入备份<input id="import-file" type="file" accept="application/json,.json" hidden></label></div></dialog>
-  <dialog id="history-dialog" class="drawer" aria-labelledby="history-title"><div class="dialog-header"><div><div class="eyebrow">LOOK HOW FAR YOU'VE COME</div><h2 id="history-title">历史记录</h2></div><button class="icon-button" data-action="close" aria-label="关闭历史记录"><i data-lucide="x"></i></button></div><div class="drawer-toolbar"><label class="search-box"><i data-lucide="search"></i><input id="history-search" type="search" placeholder="搜索题目、话题或作答" aria-label="搜索历史"></label></div><div id="history-list" class="drawer-content"></div></dialog>
-  <dialog id="settings-dialog" class="settings-dialog" aria-labelledby="settings-title"><form id="settings-form"><div class="dialog-header"><div><div class="eyebrow">MAKE IT YOURS</div><h2 id="settings-title">API 与偏好设置</h2></div><button type="button" class="icon-button" data-action="close" aria-label="关闭设置"><i data-lucide="x"></i></button></div><div class="settings-content"><p>连接 OpenAI 兼容接口，解锁实时出题与精批。</p><label>Base URL<input name="baseUrl" type="url" required placeholder="https://api.deepseek.com/v1" autocapitalize="none" spellcheck="false"></label><label>API Key<div class="key-field"><input name="apiKey" type="password" autocomplete="off" placeholder="sk-…" autocapitalize="none" spellcheck="false"><button type="button" class="icon-button" data-action="toggle-key" aria-label="显示或隐藏 Key"><i data-lucide="eye"></i></button></div></label><label>模型名称<input name="model" required placeholder="deepseek-flash" autocapitalize="none" spellcheck="false"></label><div class="settings-note"><i data-lucide="shield-check"></i><p>Key 仅保存在当前浏览器，不包含在备份中。请求会将本题、作答及必要词汇发送至你配置的服务商。纯前端调用需要接口支持 CORS。</p></div><label class="check-label"><input type="checkbox" name="sound"> 倒计时结束时播放提示音</label><div id="connection-status" role="status"></div><div class="settings-buttons"><button type="button" class="button secondary" data-action="test-api"><i data-lucide="plug-zap"></i> 测试连接</button><button class="button primary" type="submit">保存设置 <i data-lucide="check"></i></button></div></div></form></dialog>
+
+  <div id="theme-menu" class="theme-menu" popover="auto" aria-labelledby="theme-title">
+    <div class="theme-menu-heading"><div><span class="eyebrow">SET THE MOOD</span><h2 id="theme-title">选择此刻的氛围</h2></div><i data-lucide="palette" aria-hidden="true"></i></div>
+    <div class="theme-options" role="group" aria-label="配色主题">
+      <button class="theme-option" data-action="set-theme" data-value="light" aria-pressed="true"><span class="theme-swatch swatch-paper"><span></span><span></span><span></span></span><span class="theme-name">暖纸 <small>Paper</small></span><i data-lucide="check"></i></button>
+      <button class="theme-option" data-action="set-theme" data-value="sage" aria-pressed="false"><span class="theme-swatch swatch-sage"><span></span><span></span><span></span></span><span class="theme-name">鼠尾草 <small>Sage</small></span><i data-lucide="check"></i></button>
+      <button class="theme-option" data-action="set-theme" data-value="mist" aria-pressed="false"><span class="theme-swatch swatch-mist"><span></span><span></span><span></span></span><span class="theme-name">雾蓝 <small>Mist</small></span><i data-lucide="check"></i></button>
+      <button class="theme-option" data-action="set-theme" data-value="dusk" aria-pressed="false"><span class="theme-swatch swatch-dusk"><span></span><span></span><span></span></span><span class="theme-name">暮紫 <small>Dusk</small></span><i data-lucide="check"></i></button>
+      <button class="theme-option" data-action="set-theme" data-value="dark" aria-pressed="false"><span class="theme-swatch swatch-dark"><span></span><span></span><span></span></span><span class="theme-name">石墨 <small>Graphite</small></span><i data-lucide="check"></i></button>
+    </div>
+    <p>留一点喜欢的颜色，给专注。</p>
+  </div>
+
+  <dialog id="practice-controls" class="drawer preferences-drawer" aria-labelledby="preferences-title">
+    <div class="dialog-header"><div><div class="eyebrow">YOUR PRACTICE, YOUR PACE</div><h2 id="preferences-title">练习偏好</h2></div><button class="icon-button" data-action="close" aria-label="关闭练习偏好"><i data-lucide="x"></i></button></div>
+    <div class="drawer-content preferences-content">
+      <p class="preferences-intro">挑一个想聊的话题，按自己的节奏来。</p>
+      <div class="control-fields">
+        <label for="topic-select"><span>练习话题</span><select id="topic-select"><option>科技与教育</option><option>全球化</option><option>环境保护</option><option>健康与体育</option><option>工作与生活</option><option>文化与社会</option><option value="custom">＋ 自定义话题</option></select></label>
+        <form id="custom-topic-form" class="custom-topic" hidden><input id="custom-topic-input" maxlength="80" aria-label="自定义话题" placeholder="例如，城市规划"><button class="button primary" type="submit">切换话题</button></form>
+        <label for="strategy-select"><span>出题策略</span><select id="strategy-select"><option value="C">混合模式 · 巩固 + 拓展</option><option value="A">词库巩固 · 使用已收藏词</option><option value="B">拓展新题 · 避开已收藏词</option></select></label>
+      </div>
+      <div class="strategy-note"><i data-lucide="sprout"></i><p id="strategy-description">把已收藏的表达用熟，再遇见一些新搭配。</p></div>
+      <p class="draft-note"><i data-lucide="bookmark-check"></i> 切换偏好会保留当前草稿。</p>
+    </div>
+    <div class="drawer-bottom"><button class="button primary" data-action="close">准备好了 <i data-lucide="check"></i></button></div>
+  </dialog>
+
+  <dialog id="vocab-dialog" class="drawer" aria-labelledby="vocab-title">
+    <div class="dialog-header"><div><div class="eyebrow">YOUR WORD ASSETS</div><h2 id="vocab-title">好词库 <span id="vocab-dialog-count"></span></h2></div><button class="icon-button" data-action="close" aria-label="关闭好词库"><i data-lucide="x"></i></button></div>
+    <div class="drawer-toolbar"><label class="search-box"><i data-lucide="search"></i><input id="vocab-search" type="search" placeholder="搜索单词、释义" aria-label="搜索好词库"></label><select id="vocab-sort" aria-label="好词库排序"><option value="newest">最新添加</option><option value="az">字母 A–Z</option></select></div>
+    <div id="vocab-list" class="drawer-content"></div>
+    <div class="drawer-bottom"><button class="button quiet" data-action="export"><i data-lucide="download"></i> 备份练习数据</button><label class="button quiet import-label"><i data-lucide="upload"></i> 导入备份<input id="import-file" type="file" accept="application/json,.json" hidden></label></div>
+  </dialog>
+  <dialog id="history-dialog" class="drawer" aria-labelledby="history-title">
+    <div class="dialog-header"><div><div class="eyebrow">LOOK HOW FAR YOU'VE COME</div><h2 id="history-title">历史记录</h2></div><button class="icon-button" data-action="close" aria-label="关闭历史记录"><i data-lucide="x"></i></button></div>
+    <div class="drawer-toolbar"><label class="search-box"><i data-lucide="search"></i><input id="history-search" type="search" placeholder="搜索题目、话题或作答" aria-label="搜索历史"></label></div>
+    <div id="history-list" class="drawer-content"></div>
+  </dialog>
+  <dialog id="settings-dialog" class="settings-dialog" aria-labelledby="settings-title">
+    <form id="settings-form">
+      <div class="dialog-header"><div><div class="eyebrow">MAKE IT YOURS</div><h2 id="settings-title">API 与偏好设置</h2></div><button type="button" class="icon-button" data-action="close" aria-label="关闭设置"><i data-lucide="x"></i></button></div>
+      <div class="settings-content">
+        <p>连接 OpenAI 兼容接口，解锁实时出题与精批。</p>
+        <label>Base URL<input name="baseUrl" type="url" required placeholder="https://api.deepseek.com/v1" autocapitalize="none" spellcheck="false"></label>
+        <label>API Key<div class="key-field"><input name="apiKey" type="password" autocomplete="off" placeholder="sk-…" autocapitalize="none" spellcheck="false"><button type="button" class="icon-button" data-action="toggle-key" aria-label="显示或隐藏 Key"><i data-lucide="eye"></i></button></div></label>
+        <label>模型名称<input name="model" required placeholder="deepseek-flash" autocapitalize="none" spellcheck="false"></label>
+        <div class="settings-note"><i data-lucide="shield-check"></i><p>Key 仅保存在当前浏览器，不包含在备份中。请求会将本题、作答及必要词汇发送至你配置的服务商。纯前端调用需要接口支持 CORS。</p></div>
+        <label class="check-label"><input type="checkbox" name="sound"> 倒计时结束时播放提示音</label>
+        <div id="connection-status" role="status"></div>
+        <div class="settings-buttons"><button type="button" class="button secondary" data-action="test-api"><i data-lucide="plug-zap"></i> 测试连接</button><button class="button primary" type="submit">保存设置 <i data-lucide="check"></i></button></div>
+      </div>
+    </form>
+  </dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <noscript><p>请启用 JavaScript 以使用 PASSETS。</p></noscript>
 </body>
