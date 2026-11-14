@@ -43,22 +43,26 @@
       ['志愿服务让年轻人有机会回馈社会，并培养责任感。', 'Volunteering gives young people the opportunity to give back to society and develop a sense of responsibility.', phrase('give back to society', '回馈社会', 'Many graduates choose to give back to society through volunteering.'), phrase('a sense of responsibility', '责任感', 'Caring for a pet can develop a sense of responsibility.')]
     ]
   };
+  const additions=typeof module==='object'&&module.exports?require('./question-bank.js'):root.PassetsQuestionBank;
+  for(const [topic,rows] of Object.entries(additions||{}))TOPICS[topic].push(...rows);
+  const questionKey = question => normalize(question.chinese);
   function makeQuestion(data, context = {}) {
-    return {id: uid(), chinese: data.chinese, reference: data.reference, collocations: data.collocations || [], targets: data.targets || [], topic: context.topic || data.topic || '科技与教育', mode: context.mode || data.mode || 'writing', strategy: context.strategy || data.strategy || 'C', source: context.source || 'ai', createdAt: new Date().toISOString(), answer: '', review: null, selfRating: null, error: '', timer: {remaining: (context.mode || data.mode) === 'speaking' ? 20 : 90, deadline: null, warned: false}};
+    return {id: uid(), chinese: data.chinese, reference: data.reference, collocations: data.collocations || [], targets: data.targets || [], topic: context.topic || data.topic || '科技与教育', mode: context.mode || data.mode || 'writing', strategy: context.strategy || data.strategy || 'C', source: context.source || 'ai', isReview:context.practiceMode==='review'||!!context.isReview, createdAt: new Date().toISOString(), updatedAt:Date.now(), answer: '', review: null, selfRating: null, error: '', timer: {remaining: (context.mode || data.mode) === 'speaking' ? 20 : 90, deadline: null, warned: false}};
   }
   function localQuestion(context, used = []) {
-    const records = TOPICS[context.topic];
-    if (!records) throw new Error('自定义话题需要连接 AI；请先在设置中配置接口。');
-    if (context.strategy === 'A') throw new Error('词库定向巩固需要连接 AI；请先配置接口。');
-    const seen = new Set(used.map(q => normalize(q.chinese)));
-    const choices = records.filter(row => !seen.has(normalize(row[0])) && (context.strategy !== 'B' || !(context.words || []).some(word => containsPhrase(row[1], word))));
-    if (!choices.length) throw new Error('该话题的本地练习已完成。连接 AI 可继续生成全新题目，或切换其他话题。');
+    const records = [...(TOPICS[context.topic]||[]),...(context.customQuestions||[]).filter(q=>q.topic===context.topic).map(q=>[q.chinese,q.reference,...q.collocations])];
+    if (!records.length) throw new Error('该话题的题库为空，可连接 AI 补充题目。');
+    const seen = new Set([...used.map(questionKey),...(context.completedQuestions||[])]);
+    const words=context.words||[];
+    const required=context.required?.length?context.required:null;
+    const choices = records.filter(row => !seen.has(normalize(row[0])) && (context.strategy!=='A'||(required?required.every(word=>containsPhrase(row[1],word)):words.some(word=>containsPhrase(row[1],word)))) && (context.strategy !== 'B' || !words.some(word => containsPhrase(row[1], word))));
+    if (!choices.length) throw new Error(context.strategy==='A'?'当前词库没有匹配的未练题，请换个话题或出题策略。':'该话题没有未使用的题目了。可切换话题、进入复习模式，或用 AI 补充题库。');
     const row = choices[Math.floor(Math.random() * choices.length)];
     return makeQuestion({chinese: row[0], reference: row[1], collocations: row.slice(2), targets: row.slice(2, 3)}, {...context, source: 'local'});
   }
   function initialState() {
-    const q = makeQuestion({chinese: TOPICS['科技与教育'][0][0], reference: TOPICS['科技与教育'][0][1], collocations: TOPICS['科技与教育'][0].slice(2), targets: TOPICS['科技与教育'][0].slice(2,3)}, {topic:'科技与教育', mode:'writing', strategy:'C', source:'local'});
-    return {version:1, revision:0, activeQueue:[q], historyQueue:[], currentIndex:0, vocabBank:[], mode:'writing', topic:'科技与教育', strategy:'C', theme:'light', vocabSort:'newest'};
+    const q=localQuestion({topic:'科技与教育',mode:'writing',strategy:'C'});
+    return {version:1, revision:0, activeQueue:[q], historyQueue:[], currentIndex:0, vocabBank:[], mode:'writing', topic:'科技与教育', strategy:'C', practiceMode:'new',theme:'light',appearance:'day',vocabSort:'newest',completedQuestions:[],customQuestions:[],vocabRemovals:{}};
   }
   function validPhrase(p) { return p && typeof p.word === 'string' && p.word.trim() && p.word.length <= 150; }
   function validQuestion(q) { return q && typeof q.id === 'string' && typeof q.chinese === 'string' && typeof q.reference === 'string' && typeof q.answer === 'string' && ['writing','speaking'].includes(q.mode) && typeof q.topic === 'string' && Array.isArray(q.collocations) && q.collocations.every(validPhrase) && Array.isArray(q.targets) && q.targets.every(validPhrase) && q.timer && Number.isFinite(q.timer.remaining) && (q.timer.deadline === null || Number.isFinite(q.timer.deadline)); }
@@ -67,6 +71,7 @@
     const ids = [...s.activeQueue,...s.historyQueue].map(q=>q.id);
     if (new Set(ids).size !== ids.length || new Set(s.vocabBank.map(v=>normalize(v.word))).size !== s.vocabBank.length) throw new Error('数据包含重复记录。');
     for(const q of [...s.activeQueue,...s.historyQueue]){
+      q.isReview=!!(q.isReview||q.previousAttemptId);
       if(q.review){
         if(q.review.kind==='ai')q.review=validateReview(q.review);
         else if(q.review.kind!=='self'||typeof q.review.upgradedSentence!=='string')throw new Error('自评数据无效。');
@@ -75,6 +80,12 @@
     }
     s.currentIndex = Math.max(0, Math.min(Number.isInteger(s.currentIndex) ? s.currentIndex : 0, Math.max(0,s.activeQueue.length-1)));
     s.revision = Number.isFinite(s.revision) ? s.revision : 0;
+    s.practiceMode=s.practiceMode==='review'||(!s.practiceMode&&s.activeQueue[s.currentIndex]?.isReview)?'review':'new';
+    s.appearance=['day','night'].includes(s.appearance)?s.appearance:s.theme==='dark'?'night':'day';
+    s.completedQuestions=[...new Set([...(Array.isArray(s.completedQuestions)?s.completedQuestions.filter(v=>typeof v==='string'&&v.length<1000):[]),...s.historyQueue.map(questionKey)])];
+    s.customQuestions=Array.isArray(s.customQuestions)?s.customQuestions.filter(q=>q&&typeof q.chinese==='string'&&typeof q.reference==='string'&&typeof q.topic==='string'&&Array.isArray(q.collocations)&&q.collocations.every(validPhrase)):[];
+    s.vocabRemovals=s.vocabRemovals&&typeof s.vocabRemovals==='object'&&!Array.isArray(s.vocabRemovals)?s.vocabRemovals:{};
+    s.vocabRemovals=Object.fromEntries(Object.entries(s.vocabRemovals).filter(([key,value])=>key.length<=200&&Number.isFinite(Number(value))&&Number(value)>=0).map(([key,value])=>[normalize(key),Number(value)]));
     return s;
   }
   function archiveQuestion(state, id) {
@@ -85,6 +96,7 @@
     q.timer.deadline=null;
     state.activeQueue.splice(index,1);
     state.historyQueue.unshift({...q, completedAt: new Date().toISOString()});
+    state.completedQuestions=[...new Set([...(state.completedQuestions||[]),questionKey(q)])];
     state.currentIndex = Math.min(index, Math.max(0,state.activeQueue.length-1));
     return q;
   }
@@ -93,10 +105,35 @@
     if(index<0) throw new Error('历史记录不存在。');
     const old = state.historyQueue[index];
     // Keep previous attempts as immutable history; the new queue item has its own identity.
-    const q = makeQuestion(old, {...old, source:old.source});
+    const q = makeQuestion(old, {...old, source:old.source,practiceMode:'review'});
     q.previousAttemptId=old.id;
-    state.activeQueue.unshift(q);state.currentIndex=0;state.mode=q.mode;state.topic=q.topic;state.strategy=q.strategy;
+    state.activeQueue.unshift(q);state.currentIndex=0;state.mode=q.mode;state.topic=q.topic;state.strategy=q.strategy;state.practiceMode='review';
     return q;
+  }
+  function reviewQuestion(context,history,active=[]) {
+    const reserved=new Set(active.filter(q=>q.isReview&&q.topic===context.topic&&q.mode===context.mode&&q.strategy===context.strategy).map(questionKey));
+    const unique=new Map();for(const q of history)if(q.topic===context.topic&&!reserved.has(questionKey(q))&&!unique.has(questionKey(q)))unique.set(questionKey(q),q);
+    const choices=[...unique.values()];if(!choices.length)throw new Error('这个话题暂无可复习的已练题目。');
+    const old=choices[Math.floor(Math.random()*choices.length)],q=makeQuestion(old,{...context,source:old.source,practiceMode:'review'});q.previousAttemptId=old.id;return q;
+  }
+  function mergeStates(local,remote) {
+    const result=validateState(structuredClone(local)),other=validateState(structuredClone(remote));
+    const stamp=item=>Number(item.updatedAt)||Date.parse(item.completedAt||item.review?.reviewedAt||item.createdAt)||0;
+    const combine=(a,b)=>{const items=new Map(a.map(v=>[v.id,v]));for(const v of b)if(!items.has(v.id)||stamp(v)>stamp(items.get(v.id)))items.set(v.id,v);return [...items.values()];};
+    result.historyQueue=combine(result.historyQueue,other.historyQueue).sort((a,b)=>b.completedAt.localeCompare(a.completedAt));
+    const archived=new Set(result.historyQueue.map(q=>q.id));result.activeQueue=combine(result.activeQueue,other.activeQueue).filter(q=>!archived.has(q.id));
+    // Keep a recoverable copy when two devices edited the same draft independently.
+    for(const left of local.activeQueue){const right=other.activeQueue.find(q=>q.id===left.id);if(!right||!left.answer.trim()||!right.answer.trim()||left.answer===right.answer||archived.has(left.id))continue;
+      const older=stamp(left)<=stamp(right)?left:right;
+      const hash=[...older.answer].reduce((value,char)=>Math.imul(value^char.charCodeAt(0),16777619)>>>0,2166136261).toString(36),id=older.id+'-draft-'+hash;
+      if(!result.activeQueue.some(q=>q.id===id))result.activeQueue.push({...structuredClone(older),id,conflictOf:older.id,timer:{...older.timer,deadline:null}});
+    }
+    result.completedQuestions=[...new Set([...result.completedQuestions,...other.completedQuestions,...result.historyQueue.map(questionKey)])];
+    const completed=new Set(result.completedQuestions);result.activeQueue=result.activeQueue.filter(q=>{if(!q.isReview&&completed.has(questionKey(q))){if(!q.answer.trim())return false;q.isReview=true;}return true;});
+    result.customQuestions=[...new Map([...result.customQuestions,...other.customQuestions].map(q=>[questionKey(q),q])).values()];
+    for(const [key,value] of Object.entries(other.vocabRemovals))if(Number(value)>Number(result.vocabRemovals[key]||0))result.vocabRemovals[key]=value;
+    const vocabulary=new Map();for(const v of [...result.vocabBank,...other.vocabBank]){const key=normalize(v.word);if(stamp(v)>Number(result.vocabRemovals[key]||0)&&(!vocabulary.has(key)||stamp(v)>stamp(vocabulary.get(key))))vocabulary.set(key,v);}result.vocabBank=[...vocabulary.values()];
+    result.revision=Math.max(result.revision,other.revision);return validateState(result);
   }
   function parseJSON(content) {
     if (typeof content !== 'string' || !content.trim()) throw new Error('AI 返回了空内容。');
@@ -146,6 +183,6 @@
     const core=[];const seen=new Set();for(const t of operations){if(t.op==='add'&&['word','phrase'].includes(t.type)&&!seen.has(t.key)){seen.add(t.key);core.push(t.phrase||{word:t.text,pos:'',def:'',example:''});}}
     return {operations,core};
   }
-  const api={STORAGE_KEY,SETTINGS_KEY,TOPICS,STOP_WORDS,uid,normalize,containsPhrase,escapeHTML,wordCount,phrase,makeQuestion,localQuestion,initialState,validateState,archiveQuestion,restoreQuestion,parseJSON,normalizePhrases,validateGenerated,validateReview,tokenize,diffWords};
+  const api={STORAGE_KEY,SETTINGS_KEY,TOPICS,STOP_WORDS,uid,normalize,containsPhrase,escapeHTML,wordCount,phrase,questionKey,makeQuestion,localQuestion,reviewQuestion,mergeStates,initialState,validateState,archiveQuestion,restoreQuestion,parseJSON,normalizePhrases,validateGenerated,validateReview,tokenize,diffWords};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.Passets=api;
 })(typeof window!=='undefined'?window:globalThis);

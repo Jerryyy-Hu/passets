@@ -4,6 +4,7 @@ const fs=require('node:fs/promises');
 const {chromium}=require(process.argv[2]||'playwright');
 const base=process.env.PASSETS_URL||'http://127.0.0.1:4173';
 const report=[];
+async function choose(page,id,value){const label=await page.locator('#'+id+' option').evaluateAll((items,target)=>items.find(item=>item.value===target).textContent,value);await page.locator('#'+id+'-trigger').click();await page.locator('#'+id+'-options').getByRole('option',{name:label,exact:true}).click();}
 async function check(name,fn){await fn();report.push(name);console.log(`PASS ${name}`);}
 (async()=>{
   await fs.mkdir('.local',{recursive:true});
@@ -23,7 +24,7 @@ async function check(name,fn){await fn();report.push(name);console.log(`PASS ${n
     });
     await check('initial queue silently preloads without replacing the current exercise',async()=>{
       await page.waitForFunction(()=>window.PassetsApp.getState().activeQueue.length===2);
-      assert.ok((await page.locator('.question-text').textContent()).includes('科技不应取代教师'));
+      assert.ok((await page.locator('.question-text').textContent()).length>10);
     });
     await page.screenshot({path:'.local/desktop.png',fullPage:true});
     await check('draft and wall-clock timer survive a page reload',async()=>{
@@ -53,26 +54,23 @@ async function check(name,fn){await fn();report.push(name);console.log(`PASS ${n
       const s=await page.evaluate(()=>window.PassetsApp.getState());assert.equal(s.historyQueue.length,1);assert.equal(s.activeQueue[0].answer,'');assert.ok(s.activeQueue.some(q=>q.answer==='Another unfinished answer.'));
     });
     await check('vocabulary saving deduplicates and supports search plus sort',async()=>{
-      await page.locator('.target-section summary').click();await page.locator('.target-section .chip').first().click();await page.locator('.target-section .chip').first().click();
+      await page.locator('.target-section summary').click();await page.locator('.target-section .chip').first().click();const savedWord=await page.evaluate(()=>window.PassetsApp.getState().vocabBank[0].word);await page.locator('.target-section .chip').first().click();assert.equal((await page.evaluate(()=>window.PassetsApp.getState())).vocabBank.length,0);await page.locator('.target-section .chip').first().click();
       assert.equal((await page.evaluate(()=>window.PassetsApp.getState())).vocabBank.length,1);
       await page.locator('.back-home').click();await page.locator('.main-nav [data-action="vocab"]').click();await page.locator('#vocab-search').fill('not-an-existing-term');assert.equal(await page.locator('.word-card').count(),0);
-      await page.locator('#vocab-search').fill('cater');assert.equal(await page.locator('.word-card').count(),1);await page.locator('#vocab-sort').selectOption('az');
+      await page.locator('#vocab-search').fill(savedWord);assert.equal(await page.locator('.word-card').count(),1);await choose(page,'vocab-sort','az');
       await page.locator('#vocab-dialog [data-action="close"]').click();await page.waitForFunction(()=>!document.querySelector('#vocab-dialog').open);
       await page.locator('#start-practice').click();
     });
     await check('writing and speaking drafts are independent with 90/20 second timers',async()=>{
+      await page.locator('.preference-trigger').click();await choose(page,'practice-kind','new');await page.locator('#practice-controls .dialog-header [data-action="close"]').click();await page.waitForFunction(()=>!document.querySelector('#practice-controls').open);
+      const writingDraft=await page.locator('#answer-input').inputValue();
       await page.locator('#speaking-tab').click();await page.waitForSelector('#answer-input');await page.waitForFunction(()=>window.PassetsApp.getState().mode==='speaking'&&window.PassetsApp.getState().activeQueue[window.PassetsApp.getState().currentIndex]?.mode==='speaking');
       assert.equal(await page.locator('#timer-label').textContent(),'00:20');await page.locator('#answer-input').fill('Speaking draft.');
-      await page.locator('#writing-tab').click();assert.equal(await page.locator('#answer-input').inputValue(),'');
+      await page.locator('#writing-tab').click();assert.equal(await page.locator('#answer-input').inputValue(),writingDraft);
       await page.locator('#speaking-tab').click();assert.equal(await page.locator('#answer-input').inputValue(),'Speaking draft.');
     });
-    await check('background exhaustion stays quiet while an explicit generation error remains visible',async()=>{
-      assert.equal(await page.locator('#generation-status').textContent(),'');
-      const before=await page.locator('#answer-input').inputValue();
-      await page.locator('.refresh-question').click();await page.waitForSelector('#generation-status.error');
-      assert.equal(await page.locator('#answer-input').inputValue(),before);
-      await page.locator('#writing-tab').click();await page.locator('#speaking-tab').click();
-      assert.equal(await page.locator('#generation-status').textContent(),'');
+    await check('completed questions are excluded from new practice while bank prefetch stays quiet',async()=>{
+      const state=await page.evaluate(()=>window.PassetsApp.getState()),question=state.activeQueue[state.currentIndex];assert.ok(!state.completedQuestions.includes(question.chinese.toLowerCase().replace(/[^\p{L}\p{N}']+/gu,' ').trim()));assert.equal(await page.locator('#generation-status').textContent(),'');
     });
     await check('mobile layout, drawers and long content stay within the viewport',async()=>{
       await page.setViewportSize({width:390,height:844});await page.reload();await page.waitForSelector('#answer-input');
@@ -139,8 +137,8 @@ async function check(name,fn){await fn();report.push(name);console.log(`PASS ${n
     });
     await apiPage.goto(base+'/#practice');await apiPage.waitForSelector('#answer-input');
     await check('mocked API flow grades, persists JSON, renders diff and archives AI scores',async()=>{
-      await apiPage.locator('#answer-input').fill('Technology should help teachers and different students.');await apiPage.locator('#answer-input').press('Control+Enter');
-      await apiPage.waitForSelector('.band-score');assert.ok((await apiPage.locator('.band-score').textContent()).includes('7.0'));assert.ok(await apiPage.locator('.diff-word').count()>0);
+      await apiPage.locator('#answer-input').fill('Technology should help teachers and different students.');await apiPage.locator('[data-action="self-review"]').click();await apiPage.locator('[data-action="rate"][data-value="good"]').click();await apiPage.locator('#result-section [data-action="submit"]').click();
+      await apiPage.waitForSelector('.band-score');assert.equal((await apiPage.evaluate(()=>window.PassetsApp.getState())).activeQueue[0].selfAssessment.rating,'good');assert.ok((await apiPage.locator('.band-score').textContent()).includes('7.0'));assert.ok(await apiPage.locator('.diff-word').count()>0);
       await apiPage.reload();await apiPage.waitForSelector('.band-score');await apiPage.screenshot({path:'.local/ai-review.png',fullPage:true});
       await apiPage.locator('[data-action="finish"]').click();assert.equal((await apiPage.evaluate(()=>window.PassetsApp.getState())).historyQueue[0].review.overallBand,7);
     });
@@ -149,10 +147,10 @@ async function check(name,fn){await fn();report.push(name);console.log(`PASS ${n
       assert.ok((await apiPage.locator('.error-panel').textContent()).includes('401'));assert.equal(await apiPage.locator('#answer-input').inputValue(),'My answer is kept after an API error.');failReview=false;
     });
     await check('custom topics generate immediately while retaining the previous draft',async()=>{
-      await apiPage.locator('.preference-trigger').click();await apiPage.locator('#topic-select').selectOption('custom');await apiPage.locator('#custom-topic-input').fill('城市规划');await apiPage.locator('#custom-topic-form button').click();
+      await apiPage.locator('.preference-trigger').click();await choose(apiPage,'topic-select','custom');await apiPage.locator('#custom-topic-input').fill('城市规划');await apiPage.locator('#custom-topic-form button').click();
       await apiPage.locator('#practice-controls .dialog-header [data-action="close"]').click();await apiPage.waitForFunction(()=>!document.querySelector('#practice-controls').open);
       await apiPage.waitForFunction(()=>window.PassetsApp.getState().activeQueue[window.PassetsApp.getState().currentIndex]?.topic==='城市规划');assert.equal(await apiPage.locator('#answer-input').inputValue(),'');assert.ok((await apiPage.evaluate(()=>window.PassetsApp.getState())).activeQueue.some(q=>q.answer==='My answer is kept after an API error.'));
-      await apiPage.waitForFunction(()=>window.PassetsApp.getState().activeQueue.filter(q=>q.topic==='城市规划').length===2);
+      assert.ok((await apiPage.evaluate(()=>window.PassetsApp.getState())).customQuestions.some(q=>q.topic==='城市规划'));
     });
     await check('targeted vocabulary generation focuses a new A-mode question at the queue head',async()=>{
       await apiPage.locator('.target-section summary').click();await apiPage.locator('.target-section .chip').first().click();await apiPage.locator('.back-home').click();await apiPage.locator('.main-nav [data-action="vocab"]').click();

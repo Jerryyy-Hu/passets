@@ -1,0 +1,4 @@
+{
+  "framework": null,
+  "functions": {"api/account.mjs": {"maxDuration": 30}}
+}

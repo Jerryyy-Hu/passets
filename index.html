@@ -10,13 +10,18 @@
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
   <script>
     try {
-      const theme = JSON.parse(localStorage.getItem('passets.workspace.v1') || '{}').theme;
-      if (['light', 'sage', 'mist', 'dusk', 'dark'].includes(theme)) document.documentElement.dataset.theme = theme;
+      const saved = JSON.parse(localStorage.getItem('passets.workspace.v1') || '{}');
+      if (['light', 'sage', 'mist', 'dusk', 'dark'].includes(saved.theme)) document.documentElement.dataset.theme = saved.theme;
+      document.documentElement.dataset.appearance = saved.appearance || (saved.theme === 'dark' ? 'night' : 'day');
     } catch {}
   </script>
   <script defer src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
   <link rel="stylesheet" href="./styles.css">
+  <script defer src="./question-bank.js"></script>
   <script defer src="./core.js"></script>
+  <script defer src="./ui.js"></script>
+  <script defer src="./cloud-config.js"></script>
+  <script defer src="./cloud.js"></script>
   <script defer src="./app.js"></script>
 </head>
 <body>
@@ -35,9 +40,11 @@
       </nav>
       <button class="back-home" data-action="home"><i data-lucide="arrow-left"></i><span>返回主页</span></button>
       <div class="top-actions">
+        <button id="appearance-toggle" class="icon-button" data-action="appearance" aria-label="切换至夜间模式" title="日间 / 夜间模式"><i data-lucide="moon"></i></button>
         <button id="theme-trigger" class="theme-trigger" data-action="theme" popovertarget="theme-menu" aria-label="切换配色主题">
           <span class="theme-dot" aria-hidden="true"></span><span id="theme-label">暖纸</span><i data-lucide="chevron-down"></i>
         </button>
+        <button class="account-trigger icon-button" data-action="account" aria-label="登录与账号同步" title="登录与账号同步" hidden><i data-lucide="user-round"></i></button>
         <span class="header-divider" aria-hidden="true"></span>
         <button class="icon-button" data-action="settings" aria-label="打开 API 设置" title="API 与偏好设置"><i data-lucide="settings-2"></i></button>
       </div>
@@ -45,6 +52,7 @@
 
     <main id="main-content" tabindex="-1">
       <section id="home-view" class="home-view" aria-labelledby="home-title">
+        <div class="home-ambient" aria-hidden="true"><svg viewBox="0 0 1000 760" fill="none"><g stroke="currentColor"><ellipse cx="770" cy="260" rx="290" ry="160" transform="rotate(-38 770 260)"/><ellipse cx="770" cy="260" rx="245" ry="125" transform="rotate(-38 770 260)"/><ellipse cx="770" cy="260" rx="200" ry="90" transform="rotate(-38 770 260)"/><path d="M-80 680C200 250 320 970 650 600S890 380 1120 540M-80 710C210 280 325 1000 660 630S900 410 1130 570M-80 740C220 310 330 1030 670 660S910 440 1140 600"/></g></svg></div>
         <div class="hero-grid">
           <div class="hero-copy">
             <div class="eyebrow"><span class="eyebrow-line"></span> YOUR QUIET LANGUAGE SPACE</div>
@@ -53,7 +61,7 @@
             <div class="hero-signature"><span class="signature-line"></span><span>ONE SENTENCE AT A TIME</span></div>
           </div>
           <section class="entry-card" aria-label="进入表达练习">
-            <div class="entry-heading"><span class="eyebrow">MAKE ROOM FOR PROGRESS</span><span class="entry-symbol" aria-hidden="true">✳</span></div>
+            <div class="entry-heading"><span class="eyebrow">MAKE ROOM FOR PROGRESS</span><svg class="entry-symbol" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M5 23C5 12 13 5 27 5C27 19 20 27 9 27M6 26L21 11" stroke="currentColor"/></svg></div>
             <h2>今天，从这里开始。</h2>
             <div class="segmented" data-mode="writing" role="group" aria-label="主页练习模式">
               <span class="segmented-indicator" aria-hidden="true"></span>
@@ -65,6 +73,7 @@
               <span><i data-lucide="sliders-horizontal"></i><span id="home-topic">科技与教育</span></span><span>练习偏好 <i data-lucide="arrow-up-right"></i></span>
             </button>
             <button id="start-practice" class="button primary start-button" data-action="practice"><span id="home-start-label">进入练习</span><i data-lucide="arrow-right"></i></button>
+            <div class="entry-secondary"><button class="text-button" data-action="question-bank"><i data-lucide="library"></i> 浏览题库 <span id="bank-count"></span></button><button class="text-button" data-action="review-practice"><i data-lucide="rotate-ccw"></i> 复习已练题</button></div>
             <p class="entry-note" id="home-session-note">90 秒，留给一句更好的表达。</p>
           </section>
         </div>
@@ -75,6 +84,7 @@
           <div class="progress-stat"><strong id="practice-days">0 天</strong><span>练习天数</span></div>
           <div class="daily-goal"><div class="goal-heading"><span>今日小目标</span><strong id="daily-count">0 / 5</strong></div><div class="goal-track"><span id="goal-progress"></span></div><p id="goal-message">从一句开始，找到表达的手感。</p></div>
         </section>
+        <section class="home-history" aria-labelledby="recent-history-title"><div class="section-heading"><div><span class="eyebrow">YOUR PRACTICE JOURNAL</span><h2 id="recent-history-title">回看每一次进步</h2></div><button class="text-button" data-action="history">全部历史 <i data-lucide="arrow-up-right"></i></button></div><div id="recent-history"></div></section>
         <footer class="home-footer"><span>PRACTICE. COLLECT. MAKE IT YOURS.</span><span><i data-lucide="lock-keyhole"></i> 练习与词库保存在此浏览器</span></footer>
       </section>
 
@@ -90,6 +100,7 @@
             <button class="icon-button refresh-question" data-action="generate" aria-label="生成一道新题" title="生成一道新题，保留当前草稿"><i data-lucide="refresh-cw"></i></button>
           </div>
         </div>
+<div class="mobile-editor-bar"><span>当前题目</span><button data-action="finish-typing"><i data-lucide="chevron-down"></i> 收起键盘</button></div>
         <section class="exercise-card" id="exercise-card" aria-label="当前练习"></section>
         <section id="result-section" class="result-section" aria-label="批改与比对结果" hidden></section>
         <div id="generation-status" class="generation-status" role="status"></div>
@@ -115,11 +126,13 @@
     <div class="drawer-content preferences-content">
       <p class="preferences-intro">挑一个想聊的话题，按自己的节奏来。</p>
       <div class="control-fields">
+        <label><span>题目范围</span><select id="practice-kind" aria-label="题目范围"><option value="new">练新题 · 不重复已练题</option><option value="review">复习模式 · 已练题目</option></select></label>
         <label for="topic-select"><span>练习话题</span><select id="topic-select"><option>科技与教育</option><option>全球化</option><option>环境保护</option><option>健康与体育</option><option>工作与生活</option><option>文化与社会</option><option value="custom">＋ 自定义话题</option></select></label>
         <form id="custom-topic-form" class="custom-topic" hidden><input id="custom-topic-input" maxlength="80" aria-label="自定义话题" placeholder="例如，城市规划"><button class="button primary" type="submit">切换话题</button></form>
         <label for="strategy-select"><span>出题策略</span><select id="strategy-select"><option value="C">混合模式 · 巩固 + 拓展</option><option value="A">词库巩固 · 使用已收藏词</option><option value="B">拓展新题 · 避开已收藏词</option></select></label>
       </div>
       <div class="strategy-note"><i data-lucide="sprout"></i><p id="strategy-description">把已收藏的表达用熟，再遇见一些新搭配。</p></div>
+      <button class="button secondary author-question" data-action="author-question"><i data-lucide="sparkles"></i> 用 AI 补充题库</button>
       <p class="draft-note"><i data-lucide="bookmark-check"></i> 切换偏好会保留当前草稿。</p>
     </div>
     <div class="drawer-bottom"><button class="button primary" data-action="close">准备好了 <i data-lucide="check"></i></button></div>
@@ -151,6 +164,9 @@
       </div>
     </form>
   </dialog>
+
+  <dialog id="bank-dialog" class="drawer" aria-labelledby="bank-title"><div class="dialog-header"><div><span class="eyebrow">A LIBRARY OF EXPRESSIONS</span><h2 id="bank-title">表达题库 <span id="bank-summary"></span></h2></div><button class="icon-button" data-action="close" aria-label="关闭题库"><i data-lucide="x"></i></button></div><div class="drawer-toolbar"><label class="search-box"><i data-lucide="search"></i><input id="bank-search" type="search" placeholder="搜索题目或话题" aria-label="搜索题库"></label></div><div class="bank-filter" role="group" aria-label="题目状态"><button data-action="bank-filter" data-value="all" aria-pressed="true">全部</button><button data-action="bank-filter" data-value="new" aria-pressed="false">未练</button><button data-action="bank-filter" data-value="done" aria-pressed="false">已练</button></div><div id="bank-list" class="drawer-content"></div></dialog>
+  <dialog id="account-dialog" class="settings-dialog" aria-labelledby="account-title"><div class="dialog-header"><div><span class="eyebrow">PRACTICE ACROSS YOUR DEVICES</span><h2 id="account-title">账号与同步</h2></div><button type="button" class="icon-button" data-action="close" aria-label="关闭账号"><i data-lucide="x"></i></button></div><div class="settings-content"><div id="account-session" hidden><p id="account-name"></p><p id="sync-status" role="status"></p><div class="settings-buttons"><button class="button secondary" data-action="sync-now">立即同步</button><button class="button quiet" data-action="sign-out">退出登录</button></div></div><form id="account-form"><div class="auth-tabs" role="group" aria-label="登录或注册"><button type="button" data-action="auth-mode" data-value="login" aria-pressed="true">登录</button><button type="button" data-action="auth-mode" data-value="register" aria-pressed="false">创建账号</button></div><label>账号名<input name="username" autocomplete="username" required minlength="3" maxlength="32" placeholder="3–32 位字母、数字或下划线"></label><label>密码<input name="password" type="password" autocomplete="current-password" required minlength="10" maxlength="128" placeholder="至少 10 位"></label><label class="check-label"><input name="importGuest" type="checkbox"> 将此浏览器的访客进度导入账号</label><p class="account-note">账号同步题目进度、草稿、词库和历史。API Key 仍只保存在当前浏览器。</p><button id="account-submit" class="button primary" type="submit">登录并同步</button></form><p id="account-message" role="status"></p></div></dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <noscript><p>请启用 JavaScript 以使用 PASSETS。</p></noscript>
 </body>

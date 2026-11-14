@@ -12,11 +12,17 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
       - name: Check JavaScript syntax
         run: |
           node --check core.js
           node --check app.js
+          node --check question-bank.js
+          node --check ui.js
+          node --check cloud.js
+          node --check api/account.mjs
+          node --check server/account-service.mjs
           node --check tests/browser.test.cjs
+          node --check tests/refinements.test.cjs
       - name: Run core behavior tests
-        run: node --test tests/core.test.cjs
+        run: node --test tests/core.test.cjs tests/account.test.mjs
